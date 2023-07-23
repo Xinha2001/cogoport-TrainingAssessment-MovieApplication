@@ -1,0 +1,1 @@
+This project is Submitted by Saurabh Sinha. To run this, please make sure the html file and the png images are placed in a folder, else the "Star Rating" feature will not be visible to the viewer/user.

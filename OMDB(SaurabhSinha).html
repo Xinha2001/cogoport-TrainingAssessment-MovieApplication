@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie List Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #928a8a;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f2f2f2;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-box input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .search-box button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: #fff;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+        }
+
+        .search-box button:hover {
+            background-color: rgb(241, 241, 76);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .movie-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .movie {
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease-in-out; 
+        }
+
+        .movie:hover {
+            transform: translateY(-5px);
+            cursor: pointer;
+            background-color: rgb(129, 185, 231);
+        }
+
+        .movie img {
+            width: 100%;
+            border-radius: 5px;
+        }
+
+        .movie p {
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .pagination button {
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
+
+        .popup-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            max-width: 80%;
+            z-index: 1001;
+        }
+
+        .popup-content img {
+            width: 100%;
+            max-width: 300px;
+            display: block;
+            margin: 0 auto;
+            border-radius: 5px;
+        }
+
+        .movie-details h2 {
+            margin-bottom: 10px;
+        }
+
+        .movie-details p {
+            margin-bottom: 5px;
+        }
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #444;
+        }
+
+        @media screen and (max-width: 768px) {
+            .movie-list {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+
+            .popup-content {
+                max-width: 90%;
+            }
+        }
+
+        @media screen and (max-width: 576px) {
+            .movie-list {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+
+            .popup-content {
+                max-width: 100%;
+            }
+        }
+
+        .movie-rating {
+            display: flex;
+            align-items: center;
+        }
+
+        .movie-rating input {
+            display: none;
+        }
+        .movie-rating label {
+            cursor: pointer;
+            width: 25px;
+            height: 25px;
+            margin: 0;
+            padding: 0;
+            background-image: url("star.png");
+            background-size: cover;
+        }
+        .movie-rating label:hover,
+        .movie-rating label:hover ~ label,
+        .movie-rating input:checked ~ label {
+            background-image: url("star\ \(1\).png");
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Search movies...">
+            <button onclick="searchMovies()">Search</button>
+        </div>
+        <div class="movie-list" id="movieList">
+        </div>
+        <div class="pagination" id="pagination">
+        </div>
+    </div>
+    <div class="popup-overlay" id="popupOverlay">
+        <div class="popup-content">
+            <div class="movie-details" id="movieDetailsPopup">
+            </div>
+            <span class="close-button" onclick="closePopup()">&times;</span>
+        </div>
+    </div>
+<script>
+    const apiKey = '8759cea0'; // Replace with your OMDB API key
+const movieListContainer = document.getElementById('movieList');
+const paginationContainer = document.getElementById('pagination');
+const movieDetailsContainer = document.getElementById('movieDetails');
+const popupOverlay = document.getElementById('popupOverlay');
+const movieDetailsPopup = document.getElementById('movieDetailsPopup');
+let currentPage = 1;
+let totalResults = 0;
+let currentSearchQuery = '';
+
+// Function to fetch movies from the OMDB API
+async function fetchMovies(page = 1, searchQuery = '') {
+    const apiUrl = `https://www.omdbapi.com/?apikey=${apiKey}&s=${searchQuery}&page=${page}`;
+
+    try {
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data.Response === 'True') {
+            totalResults = parseInt(data.totalResults);
+            displayMovies(data.Search);
+            displayPagination();
+        } else {
+            movieListContainer.innerHTML = '';
+            paginationContainer.innerHTML = '';
+            showAlert('Please enter a correct movie name!');
+        }
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    }
+}
+function showAlert(message) {
+    const alertBox = document.createElement('div');
+    alertBox.className = 'alert';
+    alertBox.textContent = message;
+    movieListContainer.appendChild(alertBox);
+    setTimeout(() => {
+        alertBox.remove();
+    }, 2000);
+}
+function saveLastSearchQueryToLocalStorage(searchQuery) {
+    localStorage.setItem('last-search-query', searchQuery);
+}
+function getMovieRatingFromLocalStorage(movieId) {
+    const savedRating = localStorage.getItem(`movie-rating-${movieId}`);
+    return savedRating ? parseInt(savedRating) : 0;
+}
+function saveMovieRatingToLocalStorage(movieId, rating) {
+    localStorage.setItem(`movie-rating-${movieId}`, rating.toString());
+}
+
+// Function to display the movie list
+function displayMovies(movies) {
+    movieListContainer.innerHTML = '';
+
+    movies.forEach((movie) => {
+        const movieElement = document.createElement('div');
+        movieElement.classList.add('movie');
+        const savedRating = getMovieRatingFromLocalStorage(movie.imdbID);
+        movieElement.innerHTML = `
+        <img src="${movie.Poster}" alt="${movie.Title}">
+        <p>${movie.Title}</p>
+        <div class="movie-rating">
+        ${renderStarRating(movie.imdbID, savedRating)}
+        </div>
+        `;
+
+        movieElement.addEventListener('click', () => showMovieDetails(movie.imdbID));
+        movieListContainer.appendChild(movieElement);
+    });
+}
+
+function renderStarRating(movieId, savedRating) {
+    let starsHTML = '';
+
+    for (let i = 1; i <= 5; i++) {
+        const isChecked = i === savedRating ? 'checked' : '';
+        starsHTML += `
+        <input type="radio" id="rating-${movieId}-${i}" name="rating-${movieId}" value="${i}" ${isChecked}>
+        <label for="rating-${movieId}-${i}"></label>
+        `;
+    }
+
+    return starsHTML;
+}
+
+// Function to display pagination
+function displayPagination() {
+    paginationContainer.innerHTML = '';
+
+    const totalPages = Math.ceil(totalResults / 10);
+    const maxPagesToShow = 10;
+    let startPage = Math.max(currentPage - Math.floor(maxPagesToShow / 2), 1);
+    let endPage = Math.min(startPage + maxPagesToShow - 1, totalPages);
+    if (endPage - startPage + 1 < maxPagesToShow) {
+        if (startPage === 1) {
+            endPage = Math.min(maxPagesToShow, totalPages);
+        } else {
+            startPage = Math.max(endPage - maxPagesToShow + 1, 1);
+        }
+    }
+    if (startPage > 1) {
+        const previousEllipsisButton = document.createElement('button');
+        previousEllipsisButton.textContent = 'Previous';
+        previousEllipsisButton.addEventListener('click', () => changePage(startPage - 1));
+        paginationContainer.appendChild(previousEllipsisButton);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        pageButton.addEventListener('click', () => changePage(i));
+        paginationContainer.appendChild(pageButton);
+    }
+    if (endPage < totalPages) {
+        const nextEllipsisButton = document.createElement('button');
+        nextEllipsisButton.textContent = 'Next';
+        nextEllipsisButton.addEventListener('click', () => changePage(endPage + 1));
+        paginationContainer.appendChild(nextEllipsisButton);
+    }
+}
+
+function changePage(page) {
+    currentPage = page;
+    fetchMovies(currentPage, currentSearchQuery);
+}
+
+async function showMovieDetails(movieId) {
+    const apiUrl = `https://www.omdbapi.com/?apikey=${apiKey}&i=${movieId}`;
+    try {
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+        if (data.Response === 'True') {
+            const { Title, Year, Plot, Genre, Director, Actors, Poster } = data;
+            const movieDetailsHTML = `
+            <div>
+                <img src="${Poster}" alt="${Title}">
+                <h2>${Title} (${Year})</h2>
+                <p><strong>Genre:</strong> ${Genre}</p>
+                <p><strong>Director:</strong> ${Director}</p>
+                <p><strong>Actors:</strong> ${Actors}</p>
+                <p><strong>Plot:</strong> ${Plot}</p>
+            </div>
+            `;
+        movieDetailsPopup.innerHTML = movieDetailsHTML;
+        openPopup();
+        } else {
+                movieDetailsPopup.innerHTML = 'Movie details not found.';
+               }
+            } catch (error) {
+                console.error('Error fetching movie details:', error);
+            }
+        }
+        
+        //Function to display Popup
+        function openPopup() {
+            popupOverlay.style.display = 'block';
+        }
+
+        function closePopup() {
+            popupOverlay.style.display = 'none';
+        }
+
+        window.addEventListener('click', (event) => {
+            if (event.target === popupOverlay) {
+                closePopup();
+            }
+        });
+
+// Function that performs search and fetch movies accordingly
+function searchMovies() {
+    const searchInput = document.getElementById('searchInput');
+    currentSearchQuery = searchInput.value.trim();
+    currentPage = 1;
+    fetchMovies(currentPage, currentSearchQuery);
+    saveLastSearchQueryToLocalStorage(currentSearchQuery);
+}
+document.getElementById('searchInput').addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        searchMovies();
+    }
+});
+
+fetchMovies();
+window.addEventListener('load', () => {
+    const movies = document.querySelectorAll('.movie');
+    movies.forEach((movie) => {
+        const movieId = movie.querySelector('img').getAttribute('alt');
+        const ratingInputs = movie.querySelectorAll('input[name^="rating"]');
+        ratingInputs.forEach((input) => {
+            input.addEventListener('change', (event) => {
+                const rating = event.target.value;
+                saveMovieRatingToLocalStorage(movieId, rating);
+            });
+        });
+    });
+        const lastSearchQuery = localStorage.getItem('last-search-query');
+    if (lastSearchQuery) {
+        currentSearchQuery = lastSearchQuery;
+        fetchMovies(currentPage, currentSearchQuery);
+    }
+});
+</script>
+</body>
+</html>
